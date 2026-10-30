@@ -281,6 +281,14 @@
 ** LMD_RIMIX               to add diffusivity due to shear instability       **
 ** LMD_SHAPIRO             if Shapiro filtering boundary layer depth         **
 ** LMD_SKPP                if surface boundary layer KPP mixing              **
+** LT_KPP                  to activate Langmuir turbulence in KPP mixing    **
+**                         following Reichl et al. (2016): the Stokes       **
+**                         drift enters the bulk Richardson number and      **
+**                         enhances boundary layer mixing.  It requires     **
+**                         WEC (e.g., WEC_VF) to provide the Stokes drift   **
+** LT_KPP_LAGRANGIAN       to mix momentum down the Stokes drift gradient   **
+**                         (Lagrangian shear, Reichl et al. 2016, Eq. 8);   **
+**                         it requires LT_KPP                               **
 ** RI_SPLINES              if splines reconstruction for Richardson Number   **
 **                                                                           **
 ** OPTIONS in the K-profile parameterization to activate smoothing of        **

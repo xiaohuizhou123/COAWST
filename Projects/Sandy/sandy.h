@@ -17,9 +17,9 @@
 #undef  SWAN_MODEL
 #define WW3_MODEL
 #define MCT_LIB
-#define MCT_INTERP_OC2AT
-#define MCT_INTERP_WV2AT
-#define MCT_INTERP_OC2WV
+#undef MCT_INTERP_OC2AT
+#undef MCT_INTERP_WV2AT
+#undef MCT_INTERP_OC2WV
 
 #if defined WRF_MODEL && (defined WW3_MODEL || defined SWAN_MODEL)
 # undef DRAGLIM_DAVIS
@@ -106,16 +106,29 @@
 # define EMINUSP
 # define SOLAR_SOURCE
 
-/* Turbulence closure */
-# define GLS_MIXING
+/* Turbulence closure: KPP with Langmuir turbulence (Reichl et al.
+** 2016).  The CL vortex force wave-current interaction is provided
+** by WEC_VF above, with the Stokes drift from WW3.  To revert to
+** the previous GLS closure, define GLS_MIXING and remove the LMD_*
+** and LT_* options.
+*/
+# undef  GLS_MIXING
 # undef  MY25_MIXING
+# define LMD_MIXING
+# define LMD_SKPP
+# define LMD_BKPP
+# define LMD_RIMIX
+# define LMD_CONVEC
+# define LMD_NONLOCAL
+# define RI_SPLINES
+# define LT_KPP
+# define LT_KPP_LAGRANGIAN
 # define LIMIT_VDIFF
 # define LIMIT_VVISC
 
 # if defined GLS_MIXING || defined MY25_MIXING
 #  define KANTHA_CLAYSON
 #  define N2S2_HORAVG
-#  define RI_SPLINES
 #  define CRAIG_BANNER
 #  define CHARNOK
 # endif

@@ -1687,7 +1687,7 @@ CONTAINS
     !/ ------------------------------------------------------------------- /
     !/ Local parameters
     !/
-    INTEGER                 :: ITH, IK, ISP
+    INTEGER                 :: ITH, IK, ISP, IP
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
 #endif

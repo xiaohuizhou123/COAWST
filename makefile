@@ -602,19 +602,19 @@ mct_params:
 	echo "";                                                                                     \
 	cpp $(CPPFLAGS) $(MY_CPP_FLAGS) -I$(MY_ROMS_SRC)/ROMS/Include $(MY_ROMS_SRC)/Master/MCT_coupler/mod_coupler_kinds.F > mod_coupler_kinds.f90; \
 	$(MY_ROMS_SRC)/$(CLEAN) mod_coupler_kinds.f90;                                               \
-	$(FC) -c $(FFLAGS) mod_coupler_kinds.f90;                                                    \
+	mpif90 -c $(FFLAGS) mod_coupler_kinds.f90;                                                    \
 	echo "";                                                                                     \
 	cpp $(CPPFLAGS) $(MY_CPP_FLAGS) -I$(MY_ROMS_SRC)/ROMS/Include $(MY_ROMS_SRC)/Master/MCT_coupler/mct_coupler_params.F > mct_coupler_params.f90; \
 	$(MY_ROMS_SRC)/$(CLEAN) mct_coupler_params.f90;                                              \
-	$(FC) -c $(FFLAGS) mct_coupler_params.f90;                                                   \
+	mpif90 -c $(FFLAGS) mct_coupler_params.f90;                                                   \
 	echo "";                                                                                     \
 	cpp $(CPPFLAGS) $(MY_CPP_FLAGS) -I$(MY_ROMS_SRC)/ROMS/Include $(MY_ROMS_SRC)/Master/MCT_coupler/mod_coupler_iounits.F > mod_coupler_iounits.f90; \
 	$(MY_ROMS_SRC)/$(CLEAN) mod_coupler_iounits.f90;                                             \
-	$(FC) -c $(FFLAGS) mod_coupler_iounits.f90;                                                  \
+	mpif90 -c $(FFLAGS) mod_coupler_iounits.f90;                                                  \
 	echo "";                                                                                     \
 	cpp $(CPPFLAGS) $(MY_CPP_FLAGS) -I$(MY_ROMS_SRC)/ROMS/Include $(MY_ROMS_SRC)/Master/MCT_coupler/get_sparse_matrix.F > get_sparse_matrix.f90; \
 	$(MY_ROMS_SRC)/$(CLEAN) get_sparse_matrix.f90;                                             \
-	$(FC) -c $(FFLAGS) get_sparse_matrix.f90;
+	mpif90 -c $(FFLAGS) get_sparse_matrix.f90;
 #--------------------------------------------------------------------------
 #  Build SWAN.
 #--------------------------------------------------------------------------
@@ -701,7 +701,7 @@ ifdef USE_WW3
 	cd $(COAWST_WW3_DIR);                                                                       \
 	mkdir build;                                                                                \
 	cd build;                                                                                   \
-	cmake .. -DSWITCH=$(COAWST_WW3_DIR)/model/bin/switch_coawst -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release; \
+	cmake .. -DSWITCH=$(COAWST_WW3_DIR)/model/bin/switch_coawst -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_Fortran_COMPILER=mpif90 -DCMAKE_Fortran_FLAGS=-I$(MY_ROOT_DIR)/Build_roms; \
 	make --keep-going $(NCPUS);                                                                 \
 	echo "";                                                                                    \
 	echo "-------- Finished compiling WW3 ------------"                                         \
@@ -717,7 +717,7 @@ endif
 wrfclean:
 ifdef USE_WRF
 	cd $(WRF_DIR); ls; ./clean -a;                             \
-	./configure;                                               \
+	if [ ! -f configure.wrf ]; then cp configure.wrf.SCS.good configure.wrf; fi; \
 	echo " "; echo " ";                                        \
 	echo "cleaned wrf";
 endif
@@ -732,7 +732,8 @@ ifdef USE_WRF
 	cd $(WRF_DIR); ls;                                        \
 	echo " "; echo " ";                                       \
 	echo "Compiling wrf";                                     \
-	./compile em_real;                                        \
+	./compile em_real -j 1;                                        \
+	cd external/io_pnetcdf; ./build_io_pnf.sh; cd ../..;         \
 	echo "";                                                  \
 	echo "-------- Finished compiling WRF ------------"
  ifndef USE_ROMS
@@ -754,7 +755,7 @@ endif
 wrfhydroclean:
 ifdef USE_WRFHYDRO
 	cd $(WRFHYDRO_DIR); ls;                                   \
-	./configure;                                              \
+	if [ ! -f configure.wrf ]; then cp configure.wrf.SCS.good configure.wrf; fi; \
 	 make clean;                                              \
 	echo " "; echo " ";                                       \
 	echo "cleaned wrf";

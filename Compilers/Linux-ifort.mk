@@ -260,6 +260,8 @@ ifdef USE_WRF
              LIBS += $(WRF_LIB_DIR)/frame/module_internal_header_util.o
              LIBS += $(WRF_LIB_DIR)/frame/pack_utils.o
              LIBS += $(WRF_LIB_DIR)/external/io_netcdf/libwrfio_nf.a
+            LIBS += $(WRF_LIB_DIR)/external/io_pnetcdf/libwrfio_pnf.a
+            LIBS += -L/fs2/software/pnetcdf/1.14.0-icc19.0-mpi-x/lib -lpnetcdf
      WRF_MOD_DIRS  = main frame phys share external/esmf_time_f90
  else
              LIBS += $(WRF_LIB_DIR)/module_wrf_top.o
@@ -299,9 +301,10 @@ ifdef USE_WRFHYDRO
 #            LIBS +=  $(WRFHYDRO_DIR)/Land_models/NoahMP/Noah/module_sf_sfclay.o
 endif
 
-# Use full path of compiler.
+# Use full path of compiler.  Fall back to mpif90 when mpiifort is not
+# installed (which_MPI=intel with an MPICH build provides only mpif90).
 
-               FC := $(shell which ${FC})
+               FC := $(shell which ${FC} 2>/dev/null || which mpif90 2>/dev/null || echo ${FC})
                LD := $(FC)
 
 #--------------------------------------------------------------------------

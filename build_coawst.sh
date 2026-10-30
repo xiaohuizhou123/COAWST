@@ -134,7 +134,7 @@ done
 # Set the CPP option defining the particular application. This will
 # determine the name of the ".h" header file with the application
 # CPP definitions. Also this will activate the switch file for WW3.
-export   COAWST_APPLICATION=INLET_TEST
+export   COAWST_APPLICATION=SANDY
 
 # Set the ROMS_APPLICATION to be the same as the COAWST_APP.
 # Do not change this. We use the COAWST APP for other checks.
@@ -142,7 +142,7 @@ export   ROMS_APPLICATION=${COAWST_APPLICATION}
 
 # Set a local environmental variable to define the path to the directories
 # where all this project's files are kept.
-export   MY_ROOT_DIR=/cygdrive/d/models/COAWST
+export   MY_ROOT_DIR=/fs2/home/xhzhou/Model/COAWST_org
 export   MY_PROJECT_DIR=${MY_ROOT_DIR}
 
 # The path to the user's local current ROMS source code.
@@ -219,7 +219,7 @@ export   COAWST_WW3_DIR=${MY_ROOT_DIR}/WW3
 #export        USE_OpenMP=on            # shared-memory parallelism
 
 #export              FORT=ifort
-export              FORT=gfortran
+ export              FORT=ifort
 #export              FORT=pgi
 
  export         USE_DEBUG=              # use Fortran debugging flags
@@ -306,8 +306,8 @@ fi
 # customized biology model header file (like fennel.h, nemuro.h, ecosim.h,
 # etc).
 
-   export     MY_HEADER_DIR=${MY_PROJECT_DIR}/Projects/Inlet_test/Coupled
-   export MY_ANALYTICAL_DIR=${MY_PROJECT_DIR}/Projects/Inlet_test/Coupled
+   export     MY_HEADER_DIR=${MY_PROJECT_DIR}/Projects/Sandy
+ export MY_ANALYTICAL_DIR=${MY_PROJECT_DIR}/Projects/Sandy
 
 # Put the binary to execute in the following directory.
 
@@ -357,7 +357,7 @@ export WRF_DIR=${MY_ROMS_SRC}/WRF
 export WRFHYDRO_DIR=${MY_ROMS_SRC}/WRF/hydro_v5.0
 
 # first go to make some coupler files
-if [ $clean -eq 1 ] && [ $cleanwrf -eq 1 ] && [ $cleanwrfhydro -eq 1 ] && [ $cleanww3 -eq 1 ]  && [ $cleanswan -eq 1 ]; then
+if [ $clean -eq 1 ]; then
   make mct_params
 fi
   cd ${SCRATCH_DIR}

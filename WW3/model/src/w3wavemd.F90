@@ -430,8 +430,8 @@ CONTAINS
                           TAUICE, PHIBBL, TAUOCX, TAUOCY, WNMEAN, PHIAW,   &
                           PHIOC, TWS, PHICE, CHARN, W3SETA, ITSTEP
 #ifdef W3_COAWST_MODEL
-    USE W3ADATMD,  ONLY : ITIME_COAWST,                                    &
-                          PHIBRKX, PHIBRKY, PHICAPX, PHICAPY, QB,          &
+    USE W3ADATMD,  ONLY : ITIME_COAWST, CXTH, CYTH, DCXDXTH, DCXDYTH,     &
+                          DCYDXTH, DCYDYTH, PHIBRKX, PHIBRKY, QB, PHICAPX, PHICAPY, &
                           TAUOSX, TAUOSY, Z0_WAV
 #endif
 
@@ -603,7 +603,7 @@ CONTAINS
 #ifdef W3_S
     INTEGER, SAVE           :: IENT = 0
 #endif
-    INTEGER                 :: TCALC(2), IT, IT0, NT, ITEST,        &
+    INTEGER                 :: TCALC(2), IT, IT0, NT, ITEST, IP,     &
                                ITLOC, ITLOCH, NTLOC, ISEA, JSEA,    &
                                IX, IY, ISPEC, J, TOUT(2), TLST(2),  &
                                REFLED(6), IK, NKCFL

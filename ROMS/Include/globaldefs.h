@@ -954,6 +954,21 @@
 # endif
 #endif
 
+/*
+** Define internal options for Langmuir turbulence in KPP mixing
+** following Reichl et al. (2016).  The Stokes drift from the
+** wave-current interaction framework (WEC) drives the Craik-Leibovich
+** vortex force effects in the surface boundary layer.
+*/
+
+#if defined LT_KPP_LAGRANGIAN && !defined LT_KPP
+# error LT_KPP_LAGRANGIAN requires LT_KPP.
+#endif
+
+#if defined LT_KPP && !defined WEC
+# error LT_KPP requires wave effects on currents (WEC, e.g. WEC_VF) to provide the Stokes drift.
+#endif
+
 
 /*
 ** Define internal option to process wave data.

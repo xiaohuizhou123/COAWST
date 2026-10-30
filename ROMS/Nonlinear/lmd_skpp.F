@@ -31,6 +31,13 @@
 !    and model with a nonlocal boundary layer parameterization,        !
 !    Reviews of Geophysics, 32,363-403.                                !
 !                                                                      !
+!  If option LT_KPP is activated, the Langmuir turbulence due to       !
+!  the Craik-Leibovich vortex force is included following:             !
+!                                                                      !
+!  Reichl, B.G., D. Wang, T. Hara, I. Ginis, and T. Kukulka, 2016:     !
+!    Langmuir turbulence parameterization in tropical cyclone          !
+!    conditions, J. Phys. Oceanogr., 46, 863-886.                      !
+!                                                                      !
 !=======================================================================
 !
       implicit none
@@ -72,6 +79,10 @@
      &                    GRID(ng) % z_w,                               &
      &                    OCEAN(ng) % u,                                &
      &                    OCEAN(ng) % v,                                &
+# ifdef LT_KPP
+     &                    OCEAN(ng) % u_stokes,                         &
+     &                    OCEAN(ng) % v_stokes,                         &
+# endif
      &                    OCEAN(ng) % pden,                             &
      &                    FORCES(ng) % srflx,                           &
      &                    FORCES(ng) % stflx,                           &
@@ -103,7 +114,11 @@
      &                          rmask,                                  &
 # endif
      &                          f, Hz, z_r, z_w,                        &
-     &                          u, v, pden,                             &
+     &                          u, v,                                   &
+# ifdef LT_KPP
+     &                          u_stokes, v_stokes,                     &
+# endif
+     &                          pden,                                   &
      &                          srflx, stflx,                           &
      &                          bustr, bvstr, sustr, svstr,             &
      &                          alpha,                                  &
@@ -145,6 +160,10 @@
       real(r8), intent(in) :: z_w(LBi:,LBj:,0:)
       real(r8), intent(in) :: u(LBi:,LBj:,:,:)
       real(r8), intent(in) :: v(LBi:,LBj:,:,:)
+# ifdef LT_KPP
+      real(r8), intent(in) :: u_stokes(LBi:,LBj:,:)
+      real(r8), intent(in) :: v_stokes(LBi:,LBj:,:)
+# endif
       real(r8), intent(in) :: pden(LBi:,LBj:,:)
       real(r8), intent(in) :: srflx(LBi:,LBj:)
       real(r8), intent(in) :: stflx(LBi:,LBj:,:)
@@ -174,6 +193,10 @@
       real(r8), intent(in) :: z_w(LBi:UBi,LBj:UBj,0:N(ng))
       real(r8), intent(in) :: u(LBi:UBi,LBj:UBj,N(ng),3)
       real(r8), intent(in) :: v(LBi:UBi,LBj:UBj,N(ng),3)
+# ifdef LT_KPP
+      real(r8), intent(in) :: u_stokes(LBi:UBi,LBj:UBj,N(ng))
+      real(r8), intent(in) :: v_stokes(LBi:UBi,LBj:UBj,N(ng))
+# endif
       real(r8), intent(in) :: pden(LBi:UBi,LBj:UBj,N(ng))
       real(r8), intent(in) :: srflx(LBi:UBi,LBj:UBj)
       real(r8), intent(in) :: stflx(LBi:UBi,LBj:UBj,NT(ng))
@@ -198,10 +221,24 @@
 !  Local variable declarations.
 !
       integer :: i, itrc, j, k
-
+# ifdef LT_KPP
+      integer :: ks
+# endif
       real(r8), parameter :: eps = 1.0E-10_r8
       real(r8), parameter :: r3 = 1.0_r8/3.0_r8
       real(r8), parameter :: small = 1.0E-20_r8
+# ifdef LT_KPP
+!
+!  KPP-LT parameters, Reichl et al. (2016).
+!
+      real(r8), parameter :: lt_epsSL=0.1_r8   ! minimum SL depth (m)
+      real(r8), parameter :: lt_fracSL=0.2_r8  ! SL fraction of BL depth
+      real(r8), parameter :: lt_LaMin=0.05_r8  ! minimum Langmuir number
+      real(r8), parameter :: lt_LaMax=10.0_r8  ! fill Langmuir number
+      real(r8), parameter :: lt_oGmax=6.75_r8  ! 1/max[s(1-s)^2]=27/4
+!
+      real(r8) :: Lnum, ShearDir, WaveDir
+# endif
 
       real(r8) :: Gm, Gt, Gs, K_bl, Ribot, Ritop, Rk
       real(r8) :: Uk, Ustarb, Ustar3, Vk, Vtc
@@ -239,6 +276,13 @@
       real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: wm
       real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: ws
       real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: zgrid
+# ifdef LT_KPP
+      real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: LT_Fk0
+      real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: LT_Fvt2
+      real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: SLdpth
+      real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: Us_SLx
+      real(r8), dimension (IminS:ImaxS,JminS:JmaxS) :: Us_SLy
+# endif
 
 # include "set_bounds.h"
 !
@@ -274,6 +318,115 @@
 # endif
         END DO
       END DO
+# ifdef LT_KPP
+!
+!-----------------------------------------------------------------------
+!  Compute the projected surface layer Langmuir number and the
+!  associated KPP-LT enhancement factors following Reichl et al.
+!  (2016): the Craik-Leibovich vortex force (Langmuir turbulence)
+!  generated by the Stokes drift of surface waves is represented by
+!  (1) the Lagrangian current in the bulk Richardson number below,
+!  (2) enhancement of the unresolved shear contribution "Vt2" and
+!  (3) enhancement of the boundary layer mixing coefficients.
+!
+!  The surface layer is the top "lt_fracSL" fraction of the mixing
+!  layer, the latter estimated from the boundary layer depth of the
+!  previous time step.  The Stokes drift averaged over the surface
+!  layer defines the wave direction while the Lagrangian shear
+!  between the surface level and the level below the surface layer
+!  base defines the shear direction.  Their misalignment projects
+!  the Stokes drift onto the shear direction [their Eq. (25)]:
+!
+!                        sqrt(u*/( <|Us|>  * max(cos(misalign),1e-8)) )
+!          La_SLu0 = --------------------------------------------------
+!                                        1
+!-----------------------------------------------------------------------
+!
+      DO j=Jstr,Jend
+        DO i=Istr,Iend
+!
+!  Depth of the surface layer used in the Langmuir number.
+!
+          SLdpth(i,j)=MAX(lt_epsSL,                                       &
+     &                    lt_fracSL*(z_w(i,j,N(ng))-hsbl(i,j)))
+!
+!  Thickness-weighted average of the Stokes drift over the surface
+!  layer at RHO-points.  Notice that "hsbl" still contains the
+!  boundary layer depth from the previous time step.
+!
+          Us_SLx(i,j)=0.0_r8
+          Us_SLy(i,j)=0.0_r8
+          cff1=0.0_r8
+          ks=0
+          DO k=N(ng),1,-1
+            cff2=z_w(i,j,k)-MAX(z_w(i,j,k-1),                             &
+     &                          z_w(i,j,N(ng))-SLdpth(i,j))
+            IF (cff2.gt.0.0_r8) THEN
+              cff1=cff1+cff2
+              Us_SLx(i,j)=Us_SLx(i,j)+cff2*                               &
+     &                0.5_r8*(u_stokes(i  ,j,k)+u_stokes(i+1,j,k))
+              Us_SLy(i,j)=Us_SLy(i,j)+cff2*                               &
+     &                0.5_r8*(v_stokes(i,j  ,k)+v_stokes(i,j+1,k))
+            END IF
+!
+!  Find first RHO-point level below the surface layer base; it is
+!  used to determine the surface layer Lagrangian shear direction.
+!
+            IF ((ks.eq.0).and.                                           &
+     &          (z_r(i,j,k).lt.(z_w(i,j,N(ng))-SLdpth(i,j)))) THEN
+              ks=k
+            END IF
+          END DO
+          IF (cff1.gt.0.0_r8) THEN
+            Us_SLx(i,j)=Us_SLx(i,j)/cff1
+            Us_SLy(i,j)=Us_SLy(i,j)/cff1
+          ELSE
+            Us_SLx(i,j)=0.0_r8
+            Us_SLy(i,j)=0.0_r8
+          END IF
+!
+!  Lagrangian shear direction: difference between the surface level
+!  value and the value at the level below the surface layer base.
+!
+          IF (ks.gt.1) THEN
+            Uk=0.5_r8*(u(i,j,N(ng),nstp)+u(i+1,j,N(ng),nstp))-           &
+     &         0.5_r8*(u(i,j,ks,nstp)+u(i+1,j,ks,nstp))+                 &
+     &         Us_SLx(i,j)-                                              &
+     &         0.5_r8*(u_stokes(i  ,j,ks)+u_stokes(i+1,j,ks))
+            Vk=0.5_r8*(v(i,j,N(ng),nstp)+v(i,j+1,N(ng),nstp))-           &
+     &         0.5_r8*(v(i,j,ks,nstp)+v(i,j+1,ks,nstp))+                 &
+     &         Us_SLy(i,j)-                                              &
+     &         0.5_r8*(v_stokes(i,j  ,ks)+v_stokes(i,j+1,ks))
+            ShearDir=ATAN2(Vk,Uk)
+          ELSE
+            ShearDir=0.0_r8
+          END IF
+          WaveDir=ATAN2(Us_SLy(i,j),Us_SLx(i,j))
+!
+!  Projected surface layer Langmuir number with a lower bound to
+!  avoid unrealistically strong Langmuir turbulence.  In the
+!  absence of wind or waves, no enhancement is applied.
+!
+          cff=SQRT(Us_SLx(i,j)*Us_SLx(i,j)+Us_SLy(i,j)*Us_SLy(i,j))
+          IF ((Ustar(i,j).gt.0.0_r8).and.(cff.gt.1.0E-6_r8)) THEN
+            Lnum=SQRT(Ustar(i,j)/(cff+eps))
+            Lnum=MAX(lt_LaMin,                                           &
+     &               Lnum/SQRT(MAX(COS(WaveDir-ShearDir),1.0E-8_r8)))
+!
+!  Enhancement factors: boundary layer mixing coefficients
+!  [F0 = min(2.25, 1+1/La), their Eqs. (30)-(32)] and unresolved
+!  shear [Fvt2 = 1+2.3/La^(1/2), their Eq. (33)].
+!
+            LT_Fk0(i,j)=MIN(2.25_r8, 1.0_r8+1.0_r8/Lnum)
+            LT_Fvt2(i,j)=1.0_r8+2.3_r8/SQRT(Lnum)
+          ELSE
+            Lnum=lt_LaMax
+            LT_Fk0(i,j)=1.0_r8
+            LT_Fvt2(i,j)=1.0_r8
+          END IF
+        END DO
+      END DO
+# endif
 !
 !-----------------------------------------------------------------------
 !  Compute surface turbulent buoyancy forcing "Bo" (m2/s3). Remove
@@ -437,6 +590,15 @@
      &            Hz(i,j,N(ng))*(cff1*dU(i,N(ng))+cff2*dU(i,N(ng)-1))
           Vref(i)=0.5_r8*(v(i,j,N(ng),nstp)+v(i,j+1,N(ng),nstp))+       &
      &            Hz(i,j,N(ng))*(cff1*dV(i,N(ng))+cff2*dV(i,N(ng)-1))
+# ifdef LT_KPP
+!
+!  Use the Lagrangian current (Eulerian plus Stokes drift) reference
+!  values in the bulk Richardson number, Reichl et al. (2016), their
+!  Eq. (18).  The surface layer averaged Stokes drift is used here.
+!
+          Uref(i)=Uref(i)+Us_SLx(i,j)
+          Vref(i)=Vref(i)+Us_SLy(i,j)
+# endif
         END DO
 !
 !  Compute turbulent velocity scales for momentum (wm) and tracers (ws).
@@ -478,10 +640,30 @@
      &         Hz(i,j,k)*(cff1*dU(i,k-1)+cff2*dU(i,k))
             Vk=0.5_r8*(v(i,j,k,nstp)+v(i,j+1,k,nstp))-                  &
      &         Hz(i,j,k)*(cff1*dV(i,k-1)+cff2*dV(i,k))
+# ifdef LT_KPP
+!
+!  Add the Stokes drift at level "k" so that the shear in the bulk
+!  Richardson number is the Lagrangian shear, Reichl et al. (2016),
+!  their Eq. (18).
+!
+            Uk=Uk+0.5_r8*(u_stokes(i  ,j,k)+u_stokes(i+1,j,k))
+            Vk=Vk+0.5_r8*(v_stokes(i,j  ,k)+v_stokes(i,j+1,k))
+# endif
 !
             Ritop=-gorho0*(Rref(i)-Rk)*depth
+# ifdef LT_KPP
+!
+!  Enhance the unresolved turbulent shear contribution "Vt2" by the
+!  Langmuir turbulence factor, Reichl et al. (2016), their Eqs. (21)
+!  and (33).
+!
+            Ribot=(Uref(i)-Uk)**2+(Vref(i)-Vk)**2+                      &
+     &            LT_Fvt2(i,j)*                                         &
+     &            Vtc*depth*ws(i,j)*SQRT(ABS(bvf(i,j,k-1)))
+# else
             Ribot=(Uref(i)-Uk)**2+(Vref(i)-Vk)**2+                      &
      &            Vtc*depth*ws(i,j)*SQRT(ABS(bvf(i,j,k-1)))
+# endif
 # ifdef SASHA
             FC(i,k-1)=Ritop-lmd_Ric*Ribot
 # else
@@ -877,6 +1059,17 @@
 # ifdef SALINITY
               Gs=a1+a2*Gs1(i,j)+a3*dGs1dS(i,j)
 # endif
+# ifdef LT_KPP
+!
+!  Langmuir turbulence enhancement of the boundary layer mixing
+!  coefficients, Reichl et al. (2016), their Eqs. (30)-(32): the
+!  enhancement is applied where the shape function peaks and is
+!  reduced toward the surface and the base of the boundary layer,
+!                 F(s) = 1 + (F0-1) * s(1-s)^2 / max[s(1-s)^2]
+!
+              cff2=1.0_r8+(LT_Fk0(i,j)-1.0_r8)*                          &
+     &             sigma*(1.0_r8-sigma)**2*lt_oGmax
+# endif
 !
 !  Compute boundary layer mixing coefficients, combine them
 !  with interior mixing coefficients.
@@ -890,11 +1083,25 @@
               AKt(i,j,k,isalt)=MIN(lmd_nu0c,                            &
      &                             depth*ws(i,j)*(1.0_r8+sigma*Gs))
 #  endif
+#  ifdef LT_KPP
+              Akv(i,j,k)=Akv(i,j,k)*cff2
+              Akt(i,j,k,itemp)=Akt(i,j,k,itemp)*cff2
+#   ifdef SALINITY
+              AKt(i,j,k,isalt)=AKt(i,j,k,isalt)*cff2
+#   endif
+#  endif
 # else
               Akv(i,j,k)=depth*wm(i,j)*(1.0_r8+sigma*Gm)
               Akt(i,j,k,itemp)=depth*ws(i,j)*(1.0_r8+sigma*Gt)
 #  ifdef SALINITY
               AKt(i,j,k,isalt)=depth*ws(i,j)*(1.0_r8+sigma*Gs)
+#  endif
+#  ifdef LT_KPP
+              Akv(i,j,k)=Akv(i,j,k)*cff2
+              Akt(i,j,k,itemp)=Akt(i,j,k,itemp)*cff2
+#   ifdef SALINITY
+              AKt(i,j,k,isalt)=AKt(i,j,k,isalt)*cff2
+#   endif
 #  endif
 # endif
 # ifdef LMD_NONLOCAL

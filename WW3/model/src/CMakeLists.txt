@@ -179,7 +179,7 @@ if("PDLIB" IN_LIST switches)
 endif()
 
 #jcw
-  target_link_libraries(ww3_lib PUBLIC $ENV{MCT_PARAMS_DIR}/mct_coupler_params.o -L$ENV{MCT_LIBDIR} -lmct -lmpeu)
+  target_link_libraries(ww3_lib PUBLIC $ENV{MCT_PARAMS_DIR}/mct_coupler_params.o $ENV{MCT_PARAMS_DIR}/mod_coupler_iounits.o $ENV{MCT_PARAMS_DIR}/get_sparse_matrix.o -L$ENV{MCT_LIBDIR} -lmct -lmpeu)
 
 if("MPI" IN_LIST switches)
   find_package(MPI REQUIRED COMPONENTS Fortran)

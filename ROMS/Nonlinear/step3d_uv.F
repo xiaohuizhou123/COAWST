@@ -398,6 +398,20 @@
           END DO
         END DO
 
+# ifdef LT_KPP_LAGRANGIAN
+!
+!  Add the Stokes drift so that the implicit vertical viscosity
+!  solve below mixes momentum down the Lagrangian (Eulerian plus
+!  Stokes) shear, Reichl et al. (2016), their Eq. (8).  The Stokes
+!  drift is subtracted back after the tridiagonal solve.
+!
+        DO k=1,N(ng)
+          DO i=IstrU,Iend
+            u(i,j,k,nnew)=u(i,j,k,nnew)+u_stokes(i,j,k)
+          END DO
+        END DO
+# endif
+
 # ifdef SPLINES_VVISC
 !
 !  Use conservative, parabolic spline reconstruction of vertical
@@ -516,6 +530,17 @@
             DiaU3wrk(i,j,k,M3vvis)=DiaU3wrk(i,j,k,M3vvis)+              &
      &                             u(i,j,k,nnew)-wrk(i,k)
 #  endif
+          END DO
+        END DO
+# endif
+# ifdef LT_KPP_LAGRANGIAN
+!
+!  Subtract the Stokes drift to recover the Eulerian velocity after
+!  the implicit mixing down the Lagrangian shear.
+!
+        DO k=1,N(ng)
+          DO i=IstrU,Iend
+            u(i,j,k,nnew)=u(i,j,k,nnew)-u_stokes(i,j,k)
           END DO
         END DO
 # endif
@@ -865,6 +890,20 @@
             END DO
           END DO
 
+# ifdef LT_KPP_LAGRANGIAN
+!
+!  Add the Stokes drift so that the implicit vertical viscosity
+!  solve below mixes momentum down the Lagrangian (Eulerian plus
+!  Stokes) shear, Reichl et al. (2016), their Eq. (8).  The Stokes
+!  drift is subtracted back after the tridiagonal solve.
+!
+          DO k=1,N(ng)
+            DO i=Istr,Iend
+              v(i,j,k,nnew)=v(i,j,k,nnew)+v_stokes(i,j,k)
+            END DO
+          END DO
+# endif
+
 # ifdef SPLINES_VVISC
 !
 !  Use conservative, parabolic spline reconstruction of vertical
@@ -983,6 +1022,17 @@
               DiaV3wrk(i,j,k,M3vvis)=DiaV3wrk(i,j,k,M3vvis)+            &
      &                               v(i,j,k,nnew)-wrk(i,k)
 #  endif
+            END DO
+          END DO
+# endif
+# ifdef LT_KPP_LAGRANGIAN
+!
+!  Subtract the Stokes drift to recover the Eulerian velocity after
+!  the implicit mixing down the Lagrangian shear.
+!
+          DO k=1,N(ng)
+            DO i=Istr,Iend
+              v(i,j,k,nnew)=v(i,j,k,nnew)-v_stokes(i,j,k)
             END DO
           END DO
 # endif
